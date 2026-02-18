@@ -36,19 +36,29 @@ struct MazeGameView: View {
                     Text("Level \(game.level)")
                         .font(.headline)
                         .foregroundStyle(.white)
+
                     Spacer()
+
+                    // Timer
+                    Text(game.formattedTime)
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.7))
+
+                    Spacer()
+
+                    // New maze button
                     Button {
                         game.stopMotion()
-                        game.maze = MazeGenerator(
-                            rows: game.mazeRows, cols: game.mazeCols,
-                            startRow: 0, startCol: 0
-                        )
-                        game.hasWon = false
+                        game.resetMaze()
                         game.configure(screenSize: screenSize)
                         game.startMotion()
                     } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .foregroundStyle(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("New Maze")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.white.opacity(0.7))
                     }
                 }
                 .padding(.horizontal, 24)
@@ -59,12 +69,33 @@ struct MazeGameView: View {
 
             // Win overlay
             if game.hasWon {
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     Text("🎉")
                         .font(.system(size: 64))
                     Text("Level \(game.level) Complete!")
                         .font(.title.bold())
                         .foregroundStyle(.white)
+
+                    // Stats
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text("⏱ Time:")
+                            Spacer()
+                            Text(game.formattedTime)
+                        }
+                        HStack {
+                            Text("📐 Efficiency:")
+                            Spacer()
+                            Text(efficiencyLabel)
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: 200)
+                    .padding()
+                    .background(.white.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
                     Button("Next Level") {
                         game.newGame()
                         game.configure(screenSize: screenSize)
@@ -94,6 +125,14 @@ struct MazeGameView: View {
             game.stopMotion()
         }
         .persistentSystemOverlays(.hidden)
+    }
+
+    private var efficiencyLabel: String {
+        let ratio = game.struggleRatio
+        if ratio < 1.3 { return "⭐⭐⭐ Perfect!" }
+        if ratio < 2.0 { return "⭐⭐ Great" }
+        if ratio < 3.5 { return "⭐ Good" }
+        return "🔄 Keep trying!"
     }
 }
 

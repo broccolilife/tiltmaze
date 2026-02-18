@@ -21,6 +21,14 @@ class GameState: ObservableObject {
     var mazeOrigin: CGPoint = .zero
     let ballRadius: CGFloat = 6
 
+    // MARK: - Tracking
+
+    @Published var elapsedTime: TimeInterval = 0
+    @Published var totalDistance: CGFloat = 0
+    private var optimalDistance: CGFloat = 0
+    private var startTime: Date = .now
+    private var lastBallPos: CGPoint = .zero
+
     // MARK: - Physics
 
     private var velocity: CGPoint = .zero
@@ -59,6 +67,15 @@ class GameState: ObservableObject {
 
         // Place ball at start cell center
         ballPos = cellCenter(row: maze.start.row, col: maze.start.col)
+        lastBallPos = ballPos
+
+        // Calculate optimal path distance (BFS)
+        optimalDistance = computeOptimalDistance()
+
+        // Reset tracking
+        totalDistance = 0
+        elapsedTime = 0
+        startTime = .now
     }
 
     func cellCenter(row: Int, col: Int) -> CGPoint {
@@ -128,11 +145,19 @@ class GameState: ObservableObject {
             velocity.y = 0
         }
 
+        // Track distance traveled
+        let dx = ballPos.x - lastBallPos.x
+        let dy = ballPos.y - lastBallPos.y
+        totalDistance += sqrt(dx * dx + dy * dy)
+        lastBallPos = ballPos
+        elapsedTime = Date.now.timeIntervalSince(startTime)
+
         // Win check
         let endCenter = cellCenter(row: maze.end.row, col: maze.end.col)
         let dist = sqrt(pow(ballPos.x - endCenter.x, 2) + pow(ballPos.y - endCenter.y, 2))
         if dist < cellSize * 0.3 {
             hasWon = true
+            elapsedTime = Date.now.timeIntervalSince(startTime)
             stopMotion()
         }
     }
@@ -163,15 +188,83 @@ class GameState: ObservableObject {
         return false
     }
 
+    // MARK: - Difficulty & Scoring
+
+    /// How much the player struggled: 1.0 = perfect, higher = more struggle
+    var struggleRatio: CGFloat {
+        guard optimalDistance > 0 else { return 1.0 }
+        return totalDistance / optimalDistance
+    }
+
+    var formattedTime: String {
+        let t = Int(elapsedTime)
+        return String(format: "%d:%02d", t / 60, t % 60)
+    }
+
+    /// Compute optimal path length in pixels using BFS
+    private func computeOptimalDistance() -> CGFloat {
+        let rows = maze.rows
+        let cols = maze.cols
+        var visited = Array(repeating: Array(repeating: false, count: cols), count: rows)
+        var parent: [Int: Int] = [:]  // flattened index -> parent index
+        let startIdx = maze.start.row * cols + maze.start.col
+        let endIdx = maze.end.row * cols + maze.end.col
+
+        var queue = [startIdx]
+        visited[maze.start.row][maze.start.col] = true
+
+        while !queue.isEmpty {
+            let curr = queue.removeFirst()
+            let r = curr / cols
+            let c = curr % cols
+
+            if curr == endIdx { break }
+
+            let cell = maze.grid[r][c]
+            let neighbors: [(Int, Int, Bool)] = [
+                (r-1, c, !cell.top),
+                (r+1, c, !cell.bottom),
+                (r, c-1, !cell.left),
+                (r, c+1, !cell.right),
+            ]
+
+            for (nr, nc, open) in neighbors {
+                guard open, nr >= 0, nr < rows, nc >= 0, nc < cols, !visited[nr][nc] else { continue }
+                visited[nr][nc] = true
+                let nIdx = nr * cols + nc
+                parent[nIdx] = curr
+                queue.append(nIdx)
+            }
+        }
+
+        // Trace path length
+        var pathLen = 0
+        var idx = endIdx
+        while idx != startIdx {
+            guard let p = parent[idx] else { return CGFloat(rows + cols) * cellSize }
+            pathLen += 1
+            idx = p
+        }
+        return CGFloat(pathLen) * cellSize
+    }
+
     // MARK: - New Game
 
     func newGame() {
         level += 1
+        // Future: use struggleRatio to adjust difficulty
         let extraRows = min(level / 3, 10)
         let extraCols = min(level / 4, 5)
         let rows = mazeRows + extraRows
         let cols = mazeCols + extraCols
         maze = MazeGenerator(rows: rows, cols: cols, startRow: 0, startCol: 0)
+        hasWon = false
+        velocity = .zero
+    }
+
+    /// Reset current maze (new maze button)
+    func resetMaze() {
+        maze = MazeGenerator(rows: maze.rows, cols: maze.cols, startRow: maze.start.row, startCol: maze.start.col)
         hasWon = false
         velocity = .zero
     }
