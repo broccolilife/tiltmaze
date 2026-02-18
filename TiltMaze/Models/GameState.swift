@@ -32,9 +32,13 @@ class GameState: ObservableObject {
     // MARK: - Physics
 
     private var velocity: CGPoint = .zero
-    private let maxSpeed: CGFloat = 300
-    private let friction: CGFloat = 0.92
-    private let sensitivity: CGFloat = 600
+    private let maxSpeed: CGFloat = 500
+    private let friction: CGFloat = 0.94
+    private let sensitivity: CGFloat = 1000
+
+    // Trail
+    @Published var trail: [CGPoint] = []
+    private let maxTrailLength = 25
 
     // MARK: - Motion
 
@@ -76,6 +80,7 @@ class GameState: ObservableObject {
         totalDistance = 0
         elapsedTime = 0
         startTime = .now
+        trail = []
     }
 
     func cellCenter(row: Int, col: Int) -> CGPoint {
@@ -148,8 +153,17 @@ class GameState: ObservableObject {
         // Track distance traveled
         let dx = ballPos.x - lastBallPos.x
         let dy = ballPos.y - lastBallPos.y
-        totalDistance += sqrt(dx * dx + dy * dy)
+        let moved = sqrt(dx * dx + dy * dy)
+        totalDistance += moved
         lastBallPos = ballPos
+
+        // Update trail
+        if moved > 0.5 {
+            trail.append(ballPos)
+            if trail.count > maxTrailLength {
+                trail.removeFirst(trail.count - maxTrailLength)
+            }
+        }
         elapsedTime = Date.now.timeIntervalSince(startTime)
 
         // Win check

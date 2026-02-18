@@ -22,6 +22,9 @@ struct MazeGameView: View {
                 origin: game.mazeOrigin
             )
 
+            // Ball trail
+            TrailView(trail: game.trail, radius: game.ballRadius)
+
             // Ball
             BallView(
                 position: game.ballPos,
@@ -54,6 +57,37 @@ struct MazeGameView: View {
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
         .statusBarHidden()
+    }
+}
+
+// MARK: - Trail View
+
+private struct TrailView: View {
+    let trail: [CGPoint]
+    let radius: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            guard trail.count >= 2 else { return }
+
+            for (i, point) in trail.enumerated() {
+                let progress = CGFloat(i) / CGFloat(trail.count)
+                let r = radius * (0.3 + progress * 0.7)
+                let opacity = Double(progress) * 0.5
+
+                let rect = CGRect(
+                    x: point.x - r,
+                    y: point.y - r,
+                    width: r * 2,
+                    height: r * 2
+                )
+                context.fill(
+                    Path(ellipseIn: rect),
+                    with: .color(.cyan.opacity(opacity))
+                )
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
