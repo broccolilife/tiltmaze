@@ -21,4 +21,4 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         SWIFT_VERSION: "5.9"
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: "QKPHPT3K9N"
