@@ -25,6 +25,7 @@ class GameState: ObservableObject {
 
     @Published var elapsedTime: TimeInterval = 0
     @Published var totalDistance: CGFloat = 0
+    @Published var difficultyLevel: Int = 1  // 1-10 progression tracker
     private var optimalDistance: CGFloat = 0
     private var startTime: Date = .now
     private var lastBallPos: CGPoint = .zero
@@ -266,14 +267,38 @@ class GameState: ObservableObject {
 
     func newGame() {
         level += 1
-        // Future: use struggleRatio to adjust difficulty
-        let extraRows = min(level / 3, 10)
-        let extraCols = min(level / 4, 5)
-        let rows = mazeRows + extraRows
-        let cols = mazeCols + extraCols
-        maze = MazeGenerator(rows: rows, cols: cols, startRow: 0, startCol: 0)
+
+        // Adaptive difficulty based on player performance
+        let (rowDelta, colDelta) = adaptiveSizeDelta()
+        difficultyLevel = min(max(difficultyLevel + (rowDelta > 0 ? 1 : (rowDelta < 0 ? -1 : 0)), 1), 10)
+
+        let rows = max(mazeRows, maze.rows + rowDelta)
+        let cols = max(mazeCols, maze.cols + colDelta)
+        // Cap at reasonable max
+        let finalRows = min(rows, mazeRows + 20)
+        let finalCols = min(cols, mazeCols + 10)
+
+        maze = MazeGenerator(rows: finalRows, cols: finalCols, startRow: 0, startCol: 0)
         hasWon = false
         velocity = .zero
+    }
+
+    /// Determine maze size adjustment based on player's struggle and speed.
+    /// Returns (rowDelta, colDelta) to add to current maze dimensions.
+    func adaptiveSizeDelta() -> (Int, Int) {
+        let ratio = struggleRatio
+        let time = elapsedTime
+
+        if ratio < 1.5 && time < 20 {
+            // Player crushed it — make it harder
+            return (2, 1)
+        } else if ratio > 3.0 || time > 90 {
+            // Player struggled — keep same or shrink
+            return (-1, 0)
+        } else {
+            // Normal progression
+            return (1, 1)
+        }
     }
 
     /// Reset current maze (new maze button)
