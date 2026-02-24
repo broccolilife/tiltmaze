@@ -35,6 +35,8 @@ struct MazeGameView: View {
                 position: game.ballPos,
                 radius: game.ballRadius
             )
+            .accessibilityLabel("Player ball")
+            .accessibilityHidden(true)
 
             // HUD — safe area aware
             VStack(spacing: 0) {
@@ -210,6 +212,7 @@ private struct HUDBar: View {
 private struct WinOverlay: View {
     @ObservedObject var game: GameState
     @Binding var screenSize: CGSize
+    @State private var starAnimated = false
 
     var body: some View {
         ZStack {
@@ -218,15 +221,25 @@ private struct WinOverlay: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                // Stars
+                // Stars — staggered bouncy reveal
                 HStack(spacing: 8) {
                     ForEach(0..<3) { i in
                         Image(systemName: i < starCount ? "star.fill" : "star")
                             .font(.title)
                             .foregroundStyle(i < starCount ? .yellow : .white.opacity(0.3))
-                            .scaleEffect(i < starCount ? 1.0 : 0.8)
+                            .scaleEffect(starAnimated && i < starCount ? 1.0 : 0.3)
+                            .rotationEffect(.degrees(starAnimated && i < starCount ? 0 : -30))
+                            .opacity(starAnimated || i >= starCount ? 1 : 0)
+                            .animation(
+                                .bouncy(duration: 0.6, extraBounce: 0.4)
+                                    .delay(Double(i) * 0.2),
+                                value: starAnimated
+                            )
+                            .accessibilityLabel(i < starCount ? "Star \(i + 1) earned" : "Star \(i + 1) not earned")
                     }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(starCount) of 3 stars earned")
 
                 Text("Level \(game.level)")
                     .font(.largeTitle.weight(.bold))
@@ -241,8 +254,10 @@ private struct WinOverlay: View {
                 // Stats card
                 VStack(spacing: 12) {
                     StatRow(icon: "timer", label: "Time", value: game.formattedTime)
+                        .accessibilityLabel("Time: \(game.formattedTime)")
                     Divider().overlay(.white.opacity(0.1))
                     StatRow(icon: "point.topleft.down.to.point.bottomright.curvepath", label: "Efficiency", value: efficiencyLabel)
+                        .accessibilityLabel("Efficiency: \(efficiencyLabel)")
                     if let best = game.ghost.loadBest(mazeHash: game.currentMazeHash) {
                         Divider().overlay(.white.opacity(0.1))
                         StatRow(icon: "figure.run", label: "Best Time", value: formatTime(best.time))
@@ -277,6 +292,11 @@ private struct WinOverlay: View {
                 .frame(maxWidth: 260)
             }
             .padding(32)
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                starAnimated = true
+            }
         }
     }
 
