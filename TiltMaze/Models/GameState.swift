@@ -92,6 +92,10 @@ class GameState: ObservableObject {
 
     // MARK: - Motion Control
 
+    var isMotionAvailable: Bool {
+        motionManager.isDeviceMotionAvailable
+    }
+
     func startMotion() {
         guard motionManager.isDeviceMotionAvailable else { return }
         motionManager.deviceMotionUpdateInterval = 1.0 / 60.0

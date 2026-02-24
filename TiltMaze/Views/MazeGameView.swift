@@ -1,55 +1,46 @@
 import SwiftUI
+import TipKit
 
 struct MazeGameView: View {
     @StateObject private var game = GameState()
     @State private var screenSize: CGSize = .zero
     @State private var showWin = false
+    @State private var motionUnavailable = false
+
+    private let tiltTip = TiltToMoveTip()
+    private let goalTip = FindTheGoalTip()
 
     var body: some View {
         ZStack {
             // Background — deep black with subtle gradient
             LinearGradient(
-                colors: [Color(white: 0.03), .black, Color(white: 0.02)],
+                colors: [DS.Colors.background, .black, Color(white: 0.02)],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
 
-            // Maze walls
-            MazeView(
-                maze: game.maze,
-                cellSize: game.cellSize,
-                origin: game.mazeOrigin
-            )
-
-            // Ball trail
-            TrailView(trail: game.trail, radius: game.ballRadius)
-
-            // Ball
-            BallView(
-                position: game.ballPos,
-                radius: game.ballRadius
-            )
-
-            // HUD — safe area aware
-            VStack(spacing: 0) {
-                HUDBar(game: game, screenSize: $screenSize)
-                Spacer()
-            }
-
-            // Win overlay
-            if game.hasWon {
-                WinOverlay(game: game, screenSize: $screenSize)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            if motionUnavailable {
+                ErrorStateView.motionUnavailable {
+                    motionUnavailable = false
+                    game.startMotion()
+                }
+            } else {
+                gameContent
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: game.hasWon)
+        .animation(DS.Animation.standard, value: game.hasWon)
+        .animation(DS.Animation.standard, value: motionUnavailable)
         .background(
             GeometryReader { geo in
                 Color.clear.onAppear {
                     screenSize = geo.size
                     game.configure(screenSize: geo.size)
-                    game.startMotion()
+                    if game.isMotionAvailable {
+                        game.startMotion()
+                    } else {
+                        motionUnavailable = true
+                    }
                 }
             }
         )
@@ -57,6 +48,50 @@ struct MazeGameView: View {
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
         .statusBarHidden()
+    }
+
+    @ViewBuilder
+    private var gameContent: some View {
+        // Maze walls
+        MazeView(
+            maze: game.maze,
+            cellSize: game.cellSize,
+            origin: game.mazeOrigin
+        )
+        .accessibilityLabel("Maze grid, level \(game.level)")
+
+        // Ball trail
+        TrailView(trail: game.trail, radius: game.ballRadius)
+            .accessibilityHidden(true)
+
+        // Ball
+        BallView(
+            position: game.ballPos,
+            radius: game.ballRadius
+        )
+        .accessibilityLabel("Your ball")
+        .accessibilityValue("Position in maze")
+
+        // HUD — safe area aware
+        VStack(spacing: 0) {
+            HUDBar(game: game, screenSize: $screenSize)
+            // Onboarding tip — tilt instruction
+            TipView(tiltTip)
+                .padding(.horizontal, DS.Spacing.lg)
+                .tipBackground(DS.Colors.overlayDim)
+            Spacer()
+        }
+
+        // Win overlay
+        if game.hasWon {
+            WinOverlay(game: game, screenSize: $screenSize)
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                .onAppear {
+                    FindTheGoalTip.hasCompletedFirstLevel = true
+                    NewMazeTip.levelsCompleted += 1
+                    StarRatingTip.hasSeenWinScreen = true
+                }
+        }
     }
 }
 
@@ -146,10 +181,12 @@ private struct HUDBar: View {
             } label: {
                 Label("New", systemImage: "arrow.trianglehead.2.counterclockwise")
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.cyan)
+                    .foregroundStyle(DS.Colors.accent)
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
+            .accessibilityLabel("Generate new maze")
+            .accessibilityHint("Creates a fresh maze at the current difficulty")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -219,15 +256,16 @@ private struct WinOverlay: View {
                     game.startMotion()
                 } label: {
                     Text("Next Level")
-                        .font(.headline)
+                        .font(DS.Typography.button)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(.cyan)
+                        .padding(.vertical, DS.Spacing.lg)
+                        .background(DS.Colors.accent)
                         .foregroundStyle(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.md))
                 }
                 .buttonStyle(.plain)
-                .frame(maxWidth: 260)
+                .frame(maxWidth: DS.Layout.winCardMaxWidth)
+                .accessibilityLabel("Continue to level \(game.level + 1)")
             }
             .padding(32)
         }
