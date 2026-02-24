@@ -14,14 +14,20 @@ class MazeGenerator {
     let rows: Int
     let cols: Int
     var grid: [[Cell]]
+    let seed: Int
 
     /// Start and end positions
     let start: (row: Int, col: Int)
     let end: (row: Int, col: Int)
 
-    init(rows: Int, cols: Int, startRow: Int, startCol: Int) {
+    convenience init(rows: Int, cols: Int, startRow: Int, startCol: Int) {
+        self.init(rows: rows, cols: cols, startRow: startRow, startCol: startCol, seed: Int.random(in: 0..<Int.max))
+    }
+
+    init(rows: Int, cols: Int, startRow: Int, startCol: Int, seed: Int) {
         self.rows = rows
         self.cols = cols
+        self.seed = seed
         self.start = (startRow, startCol)
 
         // Place end as far as possible from start
@@ -48,20 +54,35 @@ class MazeGenerator {
         return best
     }
 
-    /// Recursive backtracking maze generation
+    /// Seeded random number generator for deterministic maze replay
+    private struct SeededRNG: RandomNumberGenerator {
+        var state: UInt64
+        init(seed: Int) { state = UInt64(bitPattern: Int64(seed)) &+ 0x9E3779B97F4A7C15 }
+        mutating func next() -> UInt64 {
+            state &+= 0x9E3779B97F4A7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+            z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+            return z ^ (z >> 31)
+        }
+    }
+
+    /// Recursive backtracking maze generation with seeded RNG
     private func generate() {
+        var rng = SeededRNG(seed: seed)
         var visited = Array(repeating: Array(repeating: false, count: cols), count: rows)
         var stack: [(Int, Int)] = [(start.row, start.col)]
         visited[start.row][start.col] = true
 
         while !stack.isEmpty {
             let (r, c) = stack.last!
-            let neighbors = unvisitedNeighbors(r, c, visited: visited)
+            var neighbors = unvisitedNeighbors(r, c, visited: visited)
 
             if neighbors.isEmpty {
                 stack.removeLast()
             } else {
-                let (nr, nc) = neighbors.randomElement()!
+                neighbors.shuffle(using: &rng)
+                let (nr, nc) = neighbors[0]
                 removeWall(r, c, nr, nc)
                 visited[nr][nc] = true
                 stack.append((nr, nc))

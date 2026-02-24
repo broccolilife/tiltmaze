@@ -25,6 +25,11 @@ struct MazeGameView: View {
             // Ball trail
             TrailView(trail: game.trail, radius: game.ballRadius)
 
+            // Ghost ball (best-time replay)
+            if game.showGhost, let ghostPos = game.ghost.ghostPosition {
+                GhostBallView(position: ghostPos, radius: game.ballRadius)
+            }
+
             // Ball
             BallView(
                 position: game.ballPos,
@@ -91,6 +96,29 @@ private struct TrailView: View {
     }
 }
 
+// MARK: - Ghost Ball View
+
+private struct GhostBallView: View {
+    let position: CGPoint
+    let radius: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [.white.opacity(0.4), .orange.opacity(0.3), .red.opacity(0.15)],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: radius * 1.2
+                )
+            )
+            .frame(width: radius * 2, height: radius * 2)
+            .shadow(color: .orange.opacity(0.3), radius: 6, x: 0, y: 0)
+            .position(position)
+            .allowsHitTesting(false)
+    }
+}
+
 // MARK: - Ball View
 
 private struct BallView: View {
@@ -136,6 +164,18 @@ private struct HUDBar: View {
                 .contentTransition(.numericText())
 
             Spacer()
+
+            // Ghost toggle
+            Button {
+                game.showGhost.toggle()
+            } label: {
+                Image(systemName: game.showGhost ? "figure.run" : "figure.stand")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(game.showGhost ? .orange : .white.opacity(0.4))
+            }
+            .buttonStyle(.plain)
+
+            Spacer().frame(width: 16)
 
             // New maze button
             Button {
@@ -200,6 +240,10 @@ private struct WinOverlay: View {
                     StatRow(icon: "timer", label: "Time", value: game.formattedTime)
                     Divider().overlay(.white.opacity(0.1))
                     StatRow(icon: "point.topleft.down.to.point.bottomright.curvepath", label: "Efficiency", value: efficiencyLabel)
+                    if let best = game.ghost.loadBest(mazeHash: game.currentMazeHash) {
+                        Divider().overlay(.white.opacity(0.1))
+                        StatRow(icon: "figure.run", label: "Best Time", value: formatTime(best.time))
+                    }
                 }
                 .padding(20)
                 .background(
@@ -239,6 +283,11 @@ private struct WinOverlay: View {
         if ratio < 2.0 { return 2 }
         if ratio < 3.5 { return 1 }
         return 0
+    }
+
+    private func formatTime(_ t: TimeInterval) -> String {
+        let s = Int(t)
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 
     private var efficiencyLabel: String {

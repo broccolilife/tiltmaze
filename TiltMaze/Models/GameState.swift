@@ -40,6 +40,10 @@ class GameState: ObservableObject {
     @Published var trail: [CGPoint] = []
     private let maxTrailLength = 25
 
+    // Ghost replay
+    let ghost = GhostReplay()
+    @Published var showGhost: Bool = true
+
     // MARK: - Motion
 
     private let motionManager = CMMotionManager()
@@ -81,6 +85,13 @@ class GameState: ObservableObject {
         elapsedTime = 0
         startTime = .now
         trail = []
+
+        // Ghost replay: start recording and playback
+        let hash = currentMazeHash
+        ghost.startRecording(mazeHash: hash)
+        if showGhost {
+            ghost.startPlayback(mazeHash: hash)
+        }
     }
 
     func cellCenter(row: Int, col: Int) -> CGPoint {
@@ -110,6 +121,10 @@ class GameState: ObservableObject {
         motionManager.stopDeviceMotionUpdates()
         displayLink?.invalidate()
         displayLink = nil
+    }
+
+    var currentMazeHash: String {
+        GhostReplay.mazeHash(rows: maze.rows, cols: maze.cols, level: level, seed: maze.seed)
     }
 
     // MARK: - Physics Update
@@ -166,12 +181,18 @@ class GameState: ObservableObject {
         }
         elapsedTime = Date.now.timeIntervalSince(startTime)
 
+        // Ghost: record position and advance playback
+        ghost.recordPosition(ballPos, elapsed: elapsedTime)
+        if showGhost { ghost.updatePlayback() }
+
         // Win check
         let endCenter = cellCenter(row: maze.end.row, col: maze.end.col)
         let dist = sqrt(pow(ballPos.x - endCenter.x, 2) + pow(ballPos.y - endCenter.y, 2))
         if dist < cellSize * 0.3 {
             hasWon = true
             elapsedTime = Date.now.timeIntervalSince(startTime)
+            ghost.finishRecording(mazeHash: currentMazeHash, level: level, time: elapsedTime)
+            ghost.stopPlayback()
             stopMotion()
         }
     }
