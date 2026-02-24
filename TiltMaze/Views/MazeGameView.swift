@@ -165,19 +165,20 @@ private struct HUDBar: View {
 
             Spacer()
 
-            // Ghost toggle
+            // Ghost toggle — HIG 44pt minimum touch target
             Button {
                 game.showGhost.toggle()
             } label: {
                 Image(systemName: game.showGhost ? "figure.run" : "figure.stand")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(game.showGhost ? .orange : .white.opacity(0.4))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(game.showGhost ? "Hide ghost replay" : "Show ghost replay")
 
-            Spacer().frame(width: 16)
-
-            // New maze button
+            // New maze button — HIG 44pt minimum touch target
             Button {
                 game.stopMotion()
                 game.resetMaze()
@@ -187,9 +188,11 @@ private struct HUDBar: View {
                 Label("New", systemImage: "arrow.trianglehead.2.counterclockwise")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.cyan)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contentShape(Rectangle())
+            .accessibilityLabel("Generate new maze")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
