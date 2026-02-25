@@ -9,7 +9,7 @@ struct MazeGameView: View {
         ZStack {
             // Background — deep black with subtle gradient
             LinearGradient(
-                colors: [Color(white: 0.03), .black, Color(white: 0.02)],
+                colors: [Tokens.GameColor.background, Tokens.GameColor.backgroundDeep, Tokens.GameColor.backgroundSubtle],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -43,7 +43,7 @@ struct MazeGameView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: game.hasWon)
+        .animation(Tokens.Spring.reveal, value: game.hasWon)
         .background(
             GeometryReader { geo in
                 Color.clear.onAppear {
@@ -108,8 +108,8 @@ private struct BallView: View {
                 )
             )
             .frame(width: radius * 2, height: radius * 2)
-            .shadow(color: .cyan.opacity(0.6), radius: 8, x: 0, y: 0)
-            .shadow(color: .cyan.opacity(0.3), radius: 16, x: 0, y: 0)
+            .shadow(color: Tokens.GameColor.ballGlow, radius: 8, x: 0, y: 0)
+            .shadow(color: Tokens.GameColor.ballGlow.opacity(0.5), radius: 16, x: 0, y: 0)
             .position(position)
     }
 }
@@ -124,15 +124,15 @@ private struct HUDBar: View {
         HStack(spacing: 0) {
             // Level pill
             Label("Level \(game.level)", systemImage: "square.grid.3x3")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
+                .font(GameTypography.hud)
+                .foregroundStyle(Tokens.GameColor.hudText)
 
             Spacer()
 
             // Timer
             Label(game.formattedTime, systemImage: "timer")
-                .font(.subheadline.weight(.medium).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
+                .font(GameTypography.hudMono)
+                .foregroundStyle(Tokens.GameColor.hudSecondary)
                 .contentTransition(.numericText())
 
             Spacer()
@@ -145,20 +145,20 @@ private struct HUDBar: View {
                 game.startMotion()
             } label: {
                 Label("New", systemImage: "arrow.trianglehead.2.counterclockwise")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.cyan)
+                    .font(GameTypography.hudMono)
+                    .foregroundStyle(Tokens.GameColor.accent)
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Tokens.Spacing.xl)
+        .padding(.vertical, Tokens.Spacing.md)
         .background(
             .ultraThinMaterial.opacity(0.5),
-            in: RoundedRectangle(cornerRadius: 16)
+            in: RoundedRectangle(cornerRadius: Tokens.Radius.lg)
         )
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
+        .padding(.horizontal, Tokens.Spacing.lg)
+        .padding(.top, Tokens.Spacing.xs)
     }
 }
 
@@ -175,38 +175,45 @@ private struct WinOverlay: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                // Stars
-                HStack(spacing: 8) {
+                // Stars with staggered bounce
+                HStack(spacing: Tokens.Spacing.sm) {
                     ForEach(0..<3) { i in
                         Image(systemName: i < starCount ? "star.fill" : "star")
-                            .font(.title)
-                            .foregroundStyle(i < starCount ? .yellow : .white.opacity(0.3))
+                            .font(GameTypography.star)
+                            .foregroundStyle(i < starCount ? Tokens.GameColor.starActive : Tokens.GameColor.starInactive)
                             .scaleEffect(i < starCount ? 1.0 : 0.8)
+                            .phaseAnimator(i < starCount ? [false, true] : [false]) { content, phase in
+                                content
+                                    .scaleEffect(phase ? 1.15 : 1.0)
+                                    .rotationEffect(.degrees(phase ? -8 : 0))
+                            } animation: { _ in
+                                Tokens.Spring.celebrate.delay(Double(i) * 0.12)
+                            }
                     }
                 }
 
                 Text("Level \(game.level)")
-                    .font(.largeTitle.weight(.bold))
-                    .foregroundStyle(.white)
+                    .font(GameTypography.display)
+                    .foregroundStyle(Tokens.GameColor.hudText)
 
                 Text("Complete")
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(GameTypography.uppercase)
+                    .foregroundStyle(Tokens.GameColor.hudSecondary)
                     .textCase(.uppercase)
-                    .kerning(2)
+                    .kerning(2.5)
 
                 // Stats card
-                VStack(spacing: 12) {
+                VStack(spacing: Tokens.Spacing.md) {
                     StatRow(icon: "timer", label: "Time", value: game.formattedTime)
                     Divider().overlay(.white.opacity(0.1))
                     StatRow(icon: "point.topleft.down.to.point.bottomright.curvepath", label: "Efficiency", value: efficiencyLabel)
                 }
-                .padding(20)
+                .padding(Tokens.Spacing.xl)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: Tokens.Radius.lg)
                         .fill(.ultraThinMaterial)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: Tokens.Radius.lg)
                                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
                         )
                 )
@@ -219,12 +226,12 @@ private struct WinOverlay: View {
                     game.startMotion()
                 } label: {
                     Text("Next Level")
-                        .font(.headline)
+                        .font(GameTypography.button)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(.cyan)
+                        .padding(.vertical, Tokens.Spacing.lg)
+                        .background(Tokens.GameColor.accent)
                         .foregroundStyle(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: 260)
@@ -261,15 +268,15 @@ private struct StatRow: View {
         HStack {
             Image(systemName: icon)
                 .font(.body)
-                .foregroundStyle(.cyan)
-                .frame(width: 24)
+                .foregroundStyle(Tokens.GameColor.accent)
+                .frame(width: Tokens.Spacing.xxl)
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.6))
+                .font(GameTypography.statLabel)
+                .foregroundStyle(Tokens.GameColor.hudSecondary)
             Spacer()
             Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
+                .font(GameTypography.stat)
+                .foregroundStyle(Tokens.GameColor.hudText)
         }
     }
 }
