@@ -2,39 +2,43 @@ import Foundation
 import CoreMotion
 import SwiftUI
 
-/// Manages ball physics, motion input, and win detection.
+/// Central game manager: owns the maze, ball physics, motion input, scoring, and win detection.
+///
+/// Uses `CMMotionManager` for accelerometer data and `CADisplayLink` for a 60fps game loop.
+/// Published properties drive SwiftUI view updates reactively.
 @MainActor
 class GameState: ObservableObject {
 
     // MARK: - Maze
 
-    @Published var maze: MazeGenerator
-    @Published var ballPos: CGPoint       // pixel position of ball center
-    @Published var hasWon: Bool = false
-    @Published var level: Int = 1
+    @Published var maze: MazeGenerator       // Current maze instance (regenerated each level)
+    @Published var ballPos: CGPoint          // Ball center position in screen coordinates (pixels)
+    @Published var hasWon: Bool = false       // Triggers win overlay in MazeGameView
+    @Published var level: Int = 1            // Current difficulty level (affects maze size)
 
     // MARK: - Config
 
-    let mazeRows: Int
-    let mazeCols: Int
-    var cellSize: CGFloat = 0
-    var mazeOrigin: CGPoint = .zero
-    let ballRadius: CGFloat = 6
+    let mazeRows: Int                        // Base maze height (rows increase with level)
+    let mazeCols: Int                        // Base maze width (cols increase with level)
+    var cellSize: CGFloat = 0                // Computed pixel size of each maze cell
+    var mazeOrigin: CGPoint = .zero          // Top-left corner of maze on screen (centered)
+    let ballRadius: CGFloat = 6              // Ball collision radius in points
 
     // MARK: - Tracking
 
-    @Published var elapsedTime: TimeInterval = 0
-    @Published var totalDistance: CGFloat = 0
-    private var optimalDistance: CGFloat = 0
+    @Published var elapsedTime: TimeInterval = 0   // Seconds since maze started
+    @Published var totalDistance: CGFloat = 0       // Total pixels the ball has traveled
+    private var optimalDistance: CGFloat = 0        // BFS-computed shortest path in pixels
     private var startTime: Date = .now
-    private var lastBallPos: CGPoint = .zero
+    private var lastBallPos: CGPoint = .zero        // Previous frame's position (for distance calc)
 
     // MARK: - Physics
+    // Tuning constants — adjust these to change game feel
 
     private var velocity: CGPoint = .zero
-    private let maxSpeed: CGFloat = 500
-    private let friction: CGFloat = 0.94
-    private let sensitivity: CGFloat = 1000
+    private let maxSpeed: CGFloat = 500      // Hard cap on ball speed (pixels/sec)
+    private let friction: CGFloat = 0.94     // Per-frame velocity damping (lower = more drag)
+    private let sensitivity: CGFloat = 1000  // Gravity → acceleration multiplier
 
     // Trail
     @Published var trail: [CGPoint] = []
@@ -114,12 +118,15 @@ class GameState: ObservableObject {
 
     // MARK: - Physics Update
 
+    /// Core physics update — called every frame (~60fps) by CADisplayLink.
+    /// Reads device gravity → computes acceleration → integrates velocity → moves ball with collision.
     private func update(dt: CGFloat) {
         guard !hasWon, let motion = motionManager.deviceMotion else { return }
 
-        // Gravity from device attitude (phone held portrait, tilted)
+        // Device gravity gives tilt direction (range -1 to 1 per axis).
+        // X maps directly; Y is inverted because screen Y grows downward.
         let ax = CGFloat(motion.gravity.x) * sensitivity
-        let ay = CGFloat(-motion.gravity.y) * sensitivity  // invert Y
+        let ay = CGFloat(-motion.gravity.y) * sensitivity  // invert Y for screen coords
 
         velocity.x = (velocity.x + ax * dt) * friction
         velocity.y = (velocity.y + ay * dt) * friction
@@ -135,7 +142,8 @@ class GameState: ObservableObject {
         let newX = ballPos.x + velocity.x * dt
         let newY = ballPos.y + velocity.y * dt
 
-        // Try X then Y separately for wall sliding
+        // Resolve X and Y movement independently — this enables "wall sliding"
+        // where the ball slides along a wall instead of stopping dead.
         let afterX = CGPoint(x: newX, y: ballPos.y)
         if !collides(at: afterX) {
             ballPos.x = newX
